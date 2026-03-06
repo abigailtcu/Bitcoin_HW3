@@ -71,20 +71,33 @@ def extract_features_pair():
     features = features.reset_index(drop=True)
     return features
 
-def get_bitcoin_historical_prices(days = 60):
+def get_bitcoin_historical_prices(days=60):
     
     BASE_URL = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
     
     params = {
         'vs_currency': 'usd',
         'days': days,
-        'interval': 'daily' # Ensure we get daily granularity
+        'interval': 'daily'
     }
-    response = requests.get(BASE_URL, params=params)
-    data = response.json()
-    prices = data['prices']
-    df = pd.DataFrame(prices, columns=['Timestamp', 'Close Price (USD)'])
-    df['Date'] = pd.to_datetime(df['Timestamp'], unit='ms').dt.normalize()
-    df = df[['Date', 'Close Price (USD)']].set_index('Date')
-    return df
 
+    try:
+        response = requests.get(BASE_URL, params=params, timeout=20)
+        response.raise_for_status()   # catches bad HTTP responses
+
+        data = response.json()
+
+        if 'prices' not in data:
+            raise ValueError(f"Missing 'prices' in API response: {data}")
+
+        prices = data['prices']
+
+        df = pd.DataFrame(prices, columns=['Timestamp', 'Close Price'])
+        df['Date'] = pd.to_datetime(df['Timestamp'], unit='ms').dt.normalize()
+        df = df[['Date', 'Close Price']].set_index('Date')
+
+        return df
+
+    except Exception as e:
+        print(f"Error fetching bitcoin prices: {e}")
+        return pd.DataFrame(columns=['Close Price'])
