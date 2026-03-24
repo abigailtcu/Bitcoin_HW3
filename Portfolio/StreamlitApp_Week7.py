@@ -61,7 +61,7 @@ MODEL_INFO = {
 
         "endpoint": aws_endpoint,
 
-        "explainer": 'explainer.shap',
+        "explainer": 'explainer_pair.shap',
 
         "pipeline": 'finalized_pair_model.tar.gz',
 
