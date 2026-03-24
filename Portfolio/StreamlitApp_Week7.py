@@ -65,7 +65,7 @@ MODEL_INFO = {
 
         "pipeline": 'finalized_pair_model.tar.gz',
 
-        "keys": ["AMZN","DVA"],
+        "keys": ["NVDA","ANET"],
 
         "inputs": [{"name": k, "type": "number", "min": 0.0, "default": 0.0, "step": 10.0} for k in ["AMZN", "DVA"]]
 
