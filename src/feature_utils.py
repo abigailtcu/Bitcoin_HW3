@@ -53,15 +53,15 @@ def extract_features_pair():
 
     START_DATE = (datetime.date.today() - datetime.timedelta(days=365)).strftime("%Y-%m-%d")
     END_DATE = datetime.date.today().strftime("%Y-%m-%d")
-    stk_tickers = ['AAPL', 'MPWR']
+    stk_tickers = ['NVDA', 'ANET']
     
     stk_data = yf.download(stk_tickers, start=START_DATE, end=END_DATE, auto_adjust=False)
 
-    Y = stk_data.loc[:, ('Adj Close', 'AAPL')]
-    Y.name = 'AAPL'
+    Y = stk_data.loc[:, ('Adj Close', 'NVDA')]
+    Y.name = 'NVDA'
 
-    X = stk_data.loc[:, ('Adj Close', 'MPWR')]
-    X.name = 'MPWR'
+    X = stk_data.loc[:, ('Adj Close', 'ANET')]
+    X.name = 'ANET'
 
     dataset = pd.concat([Y, X], axis=1).dropna()
     Y = dataset.loc[:, Y.name]
@@ -71,33 +71,20 @@ def extract_features_pair():
     features = features.reset_index(drop=True)
     return features
 
-def get_bitcoin_historical_prices(days=60):
+def get_bitcoin_historical_prices(days = 60):
     
     BASE_URL = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
     
     params = {
         'vs_currency': 'usd',
         'days': days,
-        'interval': 'daily'
+        'interval': 'daily' # Ensure we get daily granularity
     }
+    response = requests.get(BASE_URL, params=params)
+    data = response.json()
+    prices = data['prices']
+    df = pd.DataFrame(prices, columns=['Timestamp', 'Close Price (USD)'])
+    df['Date'] = pd.to_datetime(df['Timestamp'], unit='ms').dt.normalize()
+    df = df[['Date', 'Close Price (USD)']].set_index('Date')
+    return df
 
-    try:
-        response = requests.get(BASE_URL, params=params, timeout=20)
-        response.raise_for_status()   # catches bad HTTP responses
-
-        data = response.json()
-
-        if 'prices' not in data:
-            raise ValueError(f"Missing 'prices' in API response: {data}")
-
-        prices = data['prices']
-
-        df = pd.DataFrame(prices, columns=['Timestamp', 'Close Price'])
-        df['Date'] = pd.to_datetime(df['Timestamp'], unit='ms').dt.normalize()
-        df = df[['Date', 'Close Price']].set_index('Date')
-
-        return df
-
-    except Exception as e:
-        print(f"Error fetching bitcoin prices: {e}")
-        return pd.DataFrame(columns=['Close Price'])
