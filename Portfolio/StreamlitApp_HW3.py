@@ -195,7 +195,7 @@ def display_explanation(input_df, session, aws_bucket):
 
     # top feature
 
-    top_feature = pd.Series(shap_values[0, :, 0].values, index=shap_values[0, :, 0].feature_names).abs().idmax()
+    top_feature = pd.Series(shap_values[0, :, 0].values, index=shap_values[0, :, 0].feature_names).abs().idxmax()
 
     #top_feature = shap_values[0].feature_names[0]
 
