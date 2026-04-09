@@ -93,58 +93,57 @@ def convert_input_pca_regression(request_body, request_content_type):
     project_root = os.path.abspath(os.path.join(current_dir, '..'))
     file_path = os.path.join(project_root, 'Portfolio/SP500Data.csv')
 
-    dataset = pd.read_csv(file_path,index_col=0)
+    dataset = pd.read_csv(file_path, index_col=0)
 
     target = 'NVDA'
-
     option = 1
 
     if option == 2:
-
-        X = FeatureEngineer(windows=[10,15]).transform(dataset[[target]])
+        X = FeatureEngineer(windows=[10, 15]).transform(dataset[[target]])
     
         techIndicator_1 = 'RSI_15'
-        RSI_15 = json.loads(request_body)[techIndicator_1]
         techIndicator_2 = 'MOM_15'
-        MOM_15 = json.loads(request_body)[techIndicator_2]
 
-        # Calculate the distance
+        payload = json.loads(request_body)
+        RSI_15 = payload[techIndicator_1]
+        MOM_15 = payload[techIndicator_2]
+
         distances = np.sqrt(
-            (X[techIndicator_1] - RSI_15)**2 + 
-            (X[techIndicator_2] - MOM_15)**2
+            (X[techIndicator_1] - RSI_15) ** 2 +
+            (X[techIndicator_2] - MOM_15) ** 2
         )
         
         closest_index = distances.idxmin()
-        closest_row = X.loc[[closest_index]]
+        closest_row = X.loc[[closest_index]].copy()
     
         closest_row[techIndicator_1] = RSI_15
         closest_row[techIndicator_2] = MOM_15
     
         return closest_row
+
     else:
-
         return_period = 5
+        payload = json.loads(request_body)
 
-        SP500_1 = AOS_CR_Cum
-        IBM_CR_Cum = json.loads(request_body)[SP500_1]
-        SP500_2 = ABBV_CR_Cum
-        NVDA_CR_Cum = json.loads(request_body)[SP500_2]
+        input_col_1 = 'AOS_CR_Cum'
+        input_col_2 = 'ABBV_CR_Cum'
 
-        X = np.log(dataset.drop([target],axis=1)).diff(return_period)
+        aos_value = payload[input_col_1]
+        abbv_value = payload[input_col_2]
+
+        X = np.log(dataset.drop([target], axis=1)).diff(return_period)
         X = np.exp(X).cumsum()
         X.columns = [name + "_CR_Cum" for name in X.columns]
-        
-        # Calculate the distance
+
         distances = np.sqrt(
-            (X['SP500_1'] - 'AOS_CR_Cum')**2 + 
-            (X['SP500_2]' - 'ABBV_CR_Cum')**2
+            (X['AOS_CR_Cum'] - aos_value) ** 2 +
+            (X['ABBV_CR_Cum'] - abbv_value) ** 2
         )
-        
+
         closest_index = distances.idxmin()
-        closest_row = X.loc[[closest_index]]
-    
-        closest_row['SP500_1'] = 'AOS_CR_Cum'
-        closest_row['SP500_2'] = 'ABBV_CR_Cum'
-    
+        closest_row = X.loc[[closest_index]].copy()
+
+        closest_row['AOS_CR_Cum'] = aos_value
+        closest_row['ABBV_CR_Cum'] = abbv_value
+
         return closest_row
-    
