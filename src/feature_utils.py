@@ -125,7 +125,7 @@ def convert_input_pca_regression(request_body, request_content_type):
 
         return_period = 5
 
-        SP500_1 = 'AOS_CR_Cum
+        SP500_1 = AOS_CR_Cum
         IBM_CR_Cum = json.loads(request_body)[SP500_1]
         SP500_2 = ABBV_CR_Cum
         NVDA_CR_Cum = json.loads(request_body)[SP500_2]
