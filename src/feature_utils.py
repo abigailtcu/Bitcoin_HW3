@@ -136,8 +136,8 @@ def convert_input_pca_regression(request_body, request_content_type):
         
         # Calculate the distance
         distances = np.sqrt(
-            (X[SP500_1] - AOS_CR_Cum)**2 + 
-            (X[SP500_2] - ABBV_CR_Cum)**2
+            (X[SP500_1] - 'AOS_CR_Cum')**2 + 
+            (X[SP500_2] - 'ABBV_CR_Cum')**2
         )
         
         closest_index = distances.idxmin()
