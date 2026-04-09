@@ -143,8 +143,8 @@ def convert_input_pca_regression(request_body, request_content_type):
         closest_index = distances.idxmin()
         closest_row = X.loc[[closest_index]]
     
-        closest_row[SP500_1] = AOS_CR_Cum
-        closest_row[SP500_2] = ABBV_CR_Cum
+        closest_row[SP500_1] = 'AOS_CR_Cum'
+        closest_row[SP500_2] = 'ABBV_CR_Cum'
     
         return closest_row
     
