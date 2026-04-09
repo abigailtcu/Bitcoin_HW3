@@ -121,29 +121,28 @@ def convert_input_pca_regression(request_body, request_content_type):
     
         return closest_row
 
-    else:
-        return_period = 5
-        payload = json.loads(request_body)
+   else:
+    return_period = 5
+    payload = json.loads(request_body)
 
-        input_col_1 = 'AOS_CR_Cum'
-        input_col_2 = 'ABBV_CR_Cum'
+    aos_value = payload['AOS_CR_Cum']
+    abbv_value = payload['ABBV_CR_Cum']
 
-        aos_value = payload[input_col_1]
-        abbv_value = payload[input_col_2]
+    X = np.log(dataset.drop([target], axis=1)).diff(return_period)
+    X = np.exp(X).cumsum()
+    X.columns = [name + "_CR_Cum" for name in X.columns]
 
-        X = np.log(dataset.drop([target], axis=1)).diff(return_period)
-        X = np.exp(X).cumsum()
-        X.columns = [name + "_CR_Cum" for name in X.columns]
+    print("Columns in X:", X.columns.tolist())
 
-        distances = np.sqrt(
-            (X['AOS_CR_Cum'] - aos_value) ** 2 +
-            (X['ABBV_CR_Cum'] - abbv_value) ** 2
-        )
+    distances = np.sqrt(
+        (X['AOS_CR_Cum'] - aos_value) ** 2 +
+        (X['ABBV_CR_Cum'] - abbv_value) ** 2
+    )
 
-        closest_index = distances.idxmin()
-        closest_row = X.loc[[closest_index]].copy()
+    closest_index = distances.idxmin()
+    closest_row = X.loc[[closest_index]].copy()
 
-        closest_row['AOS_CR_Cum'] = aos_value
-        closest_row['ABBV_CR_Cum'] = abbv_value
+    closest_row['AOS_CR_Cum'] = aos_value
+    closest_row['ABBV_CR_Cum'] = abbv_value
 
-        return closest_row
+    return closest_row
