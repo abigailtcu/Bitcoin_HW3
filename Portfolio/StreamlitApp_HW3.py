@@ -13,9 +13,11 @@ import boto3
 import sagemaker
 from sagemaker.predictor import Predictor
 from sagemaker.serializers import CSVSerializer
-from sagemaker.deserializers import JSONDeserializer
+from sagemaker.serializers import JSONSerializer 
+from sagemaker.deserializers import JSONDeserializer 
 from sagemaker.serializers import NumpySerializer
 from sagemaker.deserializers import NumpyDeserializer
+
 
 from sklearn.pipeline import Pipeline
 import shap
@@ -34,7 +36,13 @@ project_root = os.path.abspath(os.path.join(current_dir, '..'))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from src.feature_utils import extract_features
+#from src.feature_utils import extract_features
+#from src.Custom_Classes import DropHighMissingCols, TransactionFeatureEngineer, DropHighCorrelation
+
+file_path = os.path.join(project_root, 'Portfolio/X_train.csv')
+
+dataset = pd.read_csv(file_path)
+dataset = dataset.loc[:, ~dataset.columns.str.contains('^Unnamed')]
 
 # Access the secrets
 aws_id = st.secrets["aws_credentials"]["AWS_ACCESS_KEY_ID"]
@@ -57,15 +65,15 @@ session = get_session(aws_id, aws_secret, aws_token)
 sm_session = sagemaker.Session(boto_session=session)
 
 # Data & Model Configuration
-df_features = extract_features()
 
 MODEL_INFO = {
-        "endpoint": aws_endpoint,
-        "explainer": 'explainer_sentiment.shap',
-        "pipeline": 'finalized_sentiment_model.tar.gz',
-        "keys": ['WMT','ADBE','AAPL','sentiment_lex'],
-        "inputs": [{"name": k, "type": "number", "min": -1.0, "max": 1.0, "default": 0.0, "step": 0.01} for k in ['WMT','ADBE','AAPL','sentiment_lex']]
+    "endpoint"  : aws_endpoint,
+    "explainer" : "explainer_fraud.shap",
+    "pipeline"  : "fine_tuned_pipeline.tar.gz",
+    "keys"      : ['TransactionAmt','addr1','addr2'],
+    "inputs"    : [{"name": k, "type": "number", "min": -1.0, "max": 1.0, "default": 0.0, "step": 0.01} for k in ['TransactionAmt','addr1','addr2']]
 }
+
 
 def load_pipeline(_session, bucket, key):
     s3_client = _session.client('s3')
@@ -78,7 +86,9 @@ def load_pipeline(_session, bucket, key):
         # Extract the .joblib file from the .tar.gz
     with tarfile.open(filename, "r:gz") as tar:
         tar.extractall(path=".")
-        joblib_file = [f for f in tar.getnames() if f.endswith('.joblib')][0]
+        #joblib_file = [f for f in tar.getnames() if f.endswith('.joblib')][0]
+        joblib_file = [f for f in tar.getnames() if f.endswith('.pkl')][0]
+    
 
     # Load the full pipeline
     return joblib.load(f"{joblib_file}")
@@ -101,20 +111,16 @@ def call_model_api(input_df):
     predictor = Predictor(
         endpoint_name=MODEL_INFO["endpoint"],
         sagemaker_session=sm_session,
-        serializer=NumpySerializer(),
+        serializer=JSONSerializer(), 
         deserializer=NumpyDeserializer() 
     )
 
     try:
-        # For regression
         raw_pred = predictor.predict(input_df)
         pred_val = pd.DataFrame(raw_pred).values[-1][0]
-        return round(float(pred_val), 4), 200
-        # For classification
-        #raw_pred = predictor.predict(input_df)
-        # pred_val = pd.DataFrame(raw_pred).values[-1][0]
-        #mapping = {-1: "SELL", 0: "HOLD", 1: "BUY"}
-        #return mapping.get(pred_val), 200
+        #mapping = {0: "SELL", 1: "HOLD", 2: "BUY"}
+        mapping = {0: "Legitimate", 1: "Fraud"}
+        return mapping.get(pred_val), 200
     except Exception as e:
         return f"Error: {str(e)}", 500
 
@@ -124,7 +130,8 @@ def display_explanation(input_df, session, aws_bucket):
     explainer = load_shap_explainer(session, aws_bucket, posixpath.join('explainer', explainer_name),os.path.join(tempfile.gettempdir(), explainer_name))
     
     best_pipeline = load_pipeline(session, aws_bucket, 'sklearn-pipeline-deployment')
-    preprocessing_pipeline = Pipeline(steps=best_pipeline.steps[:-2])
+    preprocessing_pipeline = Pipeline(steps=best_pipeline.steps[:-3])
+    input_df=pd.DataFrame(input_df)
     input_df_transformed = preprocessing_pipeline.transform(input_df)
     feature_names = best_pipeline[:-2].get_feature_names_out()
     input_df_transformed = pd.DataFrame(input_df_transformed, columns=feature_names)
@@ -132,14 +139,9 @@ def display_explanation(input_df, session, aws_bucket):
     
     st.subheader("🔍 Decision Transparency (SHAP)")
     fig, ax = plt.subplots(figsize=(10, 4))
-    shap.plots.waterfall(shap_values[0], max_display=10) #REGRESSION
-    #shap.plots.waterfall(shap_values[0, :, 0]) #CLASSIFICATION
+    shap.plots.waterfall(shap_values[0, :, 1])  # class 1 = fraud
     st.pyplot(fig)
-    # top feature 
-    # REGRESSION
-    top_feature = pd.Series(shap_values[0].values, index=shap_values[0].feature_names).abs().idxmax()
-    #CLASSIFICATIOn
-    #top_feature = pd.Series(shap_values[0, :, 0].values, index=shap_values[0, :, 0].feature_names).abs().idxmax()
+    top_feature = pd.Series(shap_values[0, :, 1].values, index=shap_values[0, :, 1].feature_names).abs().idxmax()
     st.info(f"**Business Insight:** The most influential factor in this decision was **{top_feature}**.")
 
 
@@ -161,20 +163,13 @@ with st.form("pred_form"):
     
     submitted = st.form_submit_button("Run Prediction")
 
+original = dataset.iloc[0:1].to_dict()
+original.update(user_inputs)
 if submitted:
 
-    data_row = [user_inputs[k] for k in MODEL_INFO["keys"]]
-    # Prepare data
-    # base_df = df_features
-    # input_df = pd.concat([base_df, pd.DataFrame([data_row], columns=base_df.columns)])
-    input_df = pd.DataFrame([data_row], columns=MODEL_INFO["keys"])
-    
-    res, status = call_model_api(input_df)
+    res, status = call_model_api(original)
     if status == 200:
         st.metric("Prediction Result", res)
-        display_explanation(input_df,session, aws_bucket)
+        display_explanation(original,session, aws_bucket)
     else:
         st.error(res)
-
-
-
