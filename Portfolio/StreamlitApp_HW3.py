@@ -69,7 +69,7 @@ sm_session = sagemaker.Session(boto_session=session)
 MODEL_INFO = {
     "endpoint"  : aws_endpoint,
     "explainer" : "explainer_project.joblib",
-    "pipeline"  : "finalized_loan_model.tar.gz",
+    "pipeline"  : "finalized_loan_model.joblib",
     "keys"      : ['num_int_rate','num_installment','num_funded_amt'],
     "inputs"    : [{"name": k, "type": "number", "min": -1.0, "max": 1.0, "default": 0.0, "step": 0.01} for k in ['num_int_rate','num_installment','num_funded_amt']]
 }
@@ -86,8 +86,8 @@ def load_pipeline(_session, bucket, key):
         # Extract the .joblib file from the .tar.gz
     with tarfile.open(filename, "r:gz") as tar:
         tar.extractall(path=".")
-        #joblib_file = [f for f in tar.getnames() if f.endswith('.joblib')][0]
-        joblib_file = [f for f in tar.getnames() if f.endswith('.pkl')][0]
+        joblib_file = [f for f in tar.getnames() if f.endswith('.joblib')][0]
+        #joblib_file = [f for f in tar.getnames() if f.endswith('.pkl')][0]
     
 
     # Load the full pipeline
@@ -119,7 +119,7 @@ def call_model_api(input_df):
         raw_pred = predictor.predict(input_df)
         pred_val = pd.DataFrame(raw_pred).values[-1][0]
         #mapping = {0: "SELL", 1: "HOLD", 2: "BUY"}
-        mapping = {0: "Legitimate", 1: "Fraud"}
+        mapping = {0: "Not Default", 1: "Default"}
         return mapping.get(pred_val), 200
     except Exception as e:
         return f"Error: {str(e)}", 500
