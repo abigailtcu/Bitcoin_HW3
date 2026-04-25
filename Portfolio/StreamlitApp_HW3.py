@@ -69,7 +69,7 @@ sm_session = sagemaker.Session(boto_session=session)
 MODEL_INFO = {
     "endpoint"  : aws_endpoint,
     "explainer" : "explainer_project.joblib",
-    "pipeline"  : "finalized_loan_model.joblib",
+    "pipeline"  : "finalized_loan_model.tar.gz",
     "keys"      : ['num_int_rate','num_installment','num_funded_amt'],
     "inputs"    : [{"name": k, "type": "number", "min": -1.0, "max": 1.0, "default": 0.0, "step": 0.01} for k in ['num_int_rate','num_installment','num_funded_amt']]
 }
