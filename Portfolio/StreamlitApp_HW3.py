@@ -125,23 +125,51 @@ def call_model_api(input_df):
         return f"Error: {str(e)}", 500
 
 # Local Explainability
+
 def display_explanation(input_df, session, aws_bucket):
+    # 1. Load the explainer and the model pipeline
     explainer_name = MODEL_INFO["explainer"]
-    explainer = load_shap_explainer(session, aws_bucket, posixpath.join('explainer', explainer_name),os.path.join(tempfile.gettempdir(), explainer_name))
-    
+    explainer = load_shap_explainer(session, aws_bucket, posixpath.join('explainer', explainer_name), os.path.join(tempfile.gettempdir(), explainer_name))
     best_pipeline = load_pipeline(session, aws_bucket, 'sklearn-pipeline-deployment')
+    
+    # 2. Slice the pipeline to get the features for the model
+    # We slice up to index -2 to include everything through 'kbest' (skipping sampler/model)
     preprocessing_pipeline = Pipeline(steps=best_pipeline.steps[:-2])
-    input_df=pd.DataFrame(input_df)
+    input_df = pd.DataFrame(input_df)
     input_df_transformed = preprocessing_pipeline.transform(input_df)
-    #feature_names = best_pipeline.named_steps["kbest"].get_feature_names_out()
-    feature_names = best_pipeline[:-2].get_feature_names_out()
+    
+    # 3. RECOVER FEATURE NAMES (The Fix for the AttributeError)
+    try:
+        # Access the specific steps that know the feature names
+        preprocessor = best_pipeline.named_steps['preprocessor']
+        kbest = best_pipeline.named_steps['kbest']
+        
+        # Get all names from preprocessor and filter by what KBest kept
+        all_names = preprocessor.get_feature_names_out()
+        kept_mask = kbest.get_support()
+        
+        # Clean the names (remove 'num__' and 'cat__')
+        feature_names = [n.split('__')[-1] for n in all_names[kept_mask]]
+    except Exception as e:
+        # Fallback if recovery fails
+        st.warning(f"Feature name recovery failed: {e}")
+        feature_names = [f"Feature {i}" for i in range(input_df_transformed.shape[1])]
+
+    # 4. Wrap transformed data in a named DataFrame
     input_df_transformed = pd.DataFrame(input_df_transformed, columns=feature_names)
+    
+    # 5. Generate and Plot SHAP values
     shap_values = explainer(input_df_transformed)
     
     st.subheader("🔍 Decision Transparency (SHAP)")
     fig, ax = plt.subplots(figsize=(10, 4))
-    shap.plots.waterfall(shap_values[0, :, 1])  # class 1 = default
+    
+    # [0, :, 1] targets the "Charged Off" probability for the waterfall
+    shap.plots.waterfall(shap_values[0, :, 1])
     st.pyplot(fig)
+    
+    # 6. Business Insight
+    # Extract the name of the feature with the highest absolute SHAP value
     top_feature = pd.Series(shap_values[0, :, 1].values, index=shap_values[0, :, 1].feature_names).abs().idxmax()
     st.info(f"**Business Insight:** The most influential factor in this decision was **{top_feature}**.")
 
