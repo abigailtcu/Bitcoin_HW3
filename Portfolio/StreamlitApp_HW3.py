@@ -144,7 +144,14 @@ def display_explanation(input_df, session, aws_bucket):
 
     #feature_names = best_pipeline.named_steps["kbest"].get_feature_names_out()
 
-    feature_names = best_pipeline[:-2].get_feature_names_out()
+    preprocessor = best_pipeline.named_steps['preprocessor']
+    names_after_preprocessor = preprocessor.get_feature_names_out()
+    
+    # Get the boolean mask of which features KBest actually kept
+    kbest_mask = best_pipeline.named_steps['kbest'].get_support()
+    
+    # Filter the names to only show the ones that made it to the model
+    feature_names = names_after_preprocessor[kbest_mask]
 
     input_df_transformed = pd.DataFrame(input_df_transformed, columns=feature_names)
 
